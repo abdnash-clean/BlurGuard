@@ -24,6 +24,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import androidx.core.graphics.createBitmap
 
 class MainActivity : AppCompatActivity() {
 
@@ -80,8 +80,22 @@ class MainActivity : AppCompatActivity() {
         converter = YuvToRgbConverter(this)
 
         // Ensure this filename matches exactly what is in your assets folder!
-        detector = RawYoloDetector(this, "best_int8.tflite")
+        lifecycleScope.launch(Dispatchers.Default) {
+            try {
+                // This runs in the background, freeing up the UI thread!
+                detector = RawYoloDetector(this@MainActivity, "finetuned_int8_416.tflite")
 
+                // 2. Switch back to the Main thread to update the UI
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "GPU Model Loaded!", Toast.LENGTH_SHORT).show()
+                    // Enable your camera or buttons here
+                    // hideLoadingSpinner()
+                    // startCamera()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera()
         } else {
@@ -117,20 +131,19 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // 1. Fast GPU YUV to RGB conversion
-                converter.yuvToRgb(imageProxy, reusableBitmap!!)
+                //converter.yuvToRgb(imageProxy, reusableBitmap);
+                reusableBitmap = YuvHelper.imageProxyToBitmap(imageProxy)
 
                 // 2. Skip frames for AI to maintain high FPS
-                if (frameCounter % 3 == 0) {
-                    cachedFaces = detector.detect(reusableBitmap!!)
-                }
+                cachedFaces = detector.detect(reusableBitmap!!)
                 frameCounter++
 
                 // 3. Pixelate Faces
                 var processedBitmap = reusableBitmap!!.copy(Bitmap.Config.ARGB_8888, true)
                 for (face in cachedFaces) {
-                    print("Face detected: ${face.left}, ${face.top}, ${face.right}, ${face.bottom}")
-                   // processedBitmap = ImageUtils.pixelateRect(processedBitmap, face, 10)
-                    processedBitmap = ImageUtils.blurRect(rs, processedBitmap, face, 25f)
+                  //  print("Face detected: ${face.left}, ${face.top}, ${face.right}, ${face.bottom}")
+                    processedBitmap = ImageUtils.pixelateRect(processedBitmap, face, 10)
+//                    processedBitmap = ImageUtils.blurRect(rs, processedBitmap, face, 25f)
                 }
 
                 // 4. Update UI via Coroutine (No more runOnUiThread mess)

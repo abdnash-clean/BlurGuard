@@ -5,7 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.common.FileUtil
+import org.tensorflow.lite.gpu.CompatibilityList
+import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.support.common.TensorProcessor
 import org.tensorflow.lite.support.common.ops.DequantizeOp
 import org.tensorflow.lite.support.common.ops.NormalizeOp
@@ -22,8 +23,11 @@ import kotlin.math.min
 class RawYoloDetector(context: Context, modelName: String) {
     private var interpreter: Interpreter? = null
 
+    // NEW: Keep a reference to the GPU delegate so it can be closed later
+    private var gpuDelegate: GpuDelegate? = null
+
     // MUST MATCH YOUR COLAB EXPORT SIZE (320 or 416 or 640)
-    private val INPUT_SIZE = 640
+    private val INPUT_SIZE = 416
 
     private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputProcessor: TensorProcessor
@@ -33,11 +37,27 @@ class RawYoloDetector(context: Context, modelName: String) {
 
     init {
         try {
-            val tfliteModel = loadModelFile(context, modelName) // Using our new manual function
-            val options = Interpreter.Options().apply {
-                setNumThreads(4)
-                useXNNPACK = true
+            val tfliteModel = loadModelFile(context, modelName)
+            val options = Interpreter.Options()
+
+            // ---------------------------------------------------------
+            // NEW: GPU DELEGATE INITIALIZATION
+            // ---------------------------------------------------------
+            val compatList = CompatibilityList()
+
+            if (compatList.isDelegateSupportedOnThisDevice) {
+                // Device supports GPU - Configure and use it
+                val delegateOptions = compatList.bestOptionsForThisDevice
+                gpuDelegate = GpuDelegate(delegateOptions)
+                options.addDelegate(gpuDelegate)
+                android.util.Log.d("BlurGuard", "GPU Delegate initialized successfully!")
+            } else {
+                // Fallback to CPU with XNNPACK if GPU is not supported
+                options.setNumThreads(4)
+                options.useXNNPACK = true
+                android.util.Log.d("BlurGuard", "GPU not supported on this device. Falling back to CPU.")
             }
+            // ---------------------------------------------------------
 
             interpreter = Interpreter(tfliteModel, options)
 
@@ -79,7 +99,7 @@ class RawYoloDetector(context: Context, modelName: String) {
         val data = processedOutput.floatArray
 
         val detections = mutableListOf<Rect>()
-        val threshold = 0.30f // Lowered to 30% to ensure we see the blur
+        val threshold = 0.30f
 
         // FORMAT A: Standard YOLOv8[1, Features, Anchors (e.g. 8400)]
         if (outputShape.size == 3 && outputShape[2] > 500) {
@@ -127,7 +147,6 @@ class RawYoloDetector(context: Context, modelName: String) {
             }
         }
 
-        // Log to console so you can see if it's finding faces
         if (detections.isNotEmpty()) {
             android.util.Log.d("BlurGuard", "Found ${detections.size} objects!")
         }
@@ -139,9 +158,6 @@ class RawYoloDetector(context: Context, modelName: String) {
         val scaleX: Float
         val scaleY: Float
 
-        // AUTO-DETECT SCALING:
-        // If x is < 2.0, the model output Normalized coords (0.0 to 1.0)
-        // If x is > 2.0, it output Absolute pixels (0 to INPUT_SIZE)
         if (x <= 2.0f && y <= 2.0f && w <= 2.0f && h <= 2.0f) {
             scaleX = bitmap.width.toFloat()
             scaleY = bitmap.height.toFloat()
@@ -163,7 +179,6 @@ class RawYoloDetector(context: Context, modelName: String) {
         )
     }
 
-
     private fun loadModelFile(context: Context, modelName: String): MappedByteBuffer {
         val fileDescriptor = context.assets.openFd(modelName)
         val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
@@ -171,5 +186,15 @@ class RawYoloDetector(context: Context, modelName: String) {
         val startOffset = fileDescriptor.startOffset
         val declaredLength = fileDescriptor.declaredLength
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    }
+
+    // ---------------------------------------------------------
+    // NEW: Memory Management Method
+    // ---------------------------------------------------------
+    fun close() {
+        interpreter?.close()
+        interpreter = null
+        gpuDelegate?.close()
+        gpuDelegate = null
     }
 }
