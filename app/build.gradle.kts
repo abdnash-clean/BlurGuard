@@ -39,4 +39,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation(project(":feature:camera"))
+    implementation(project(":feature:settings"))
+    implementation(project(":core:designsystem"))
+    implementation(project(":core:data"))
 }
