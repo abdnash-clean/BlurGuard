@@ -20,13 +20,26 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BlurGuard"
+
+// App
 include(":app")
-include(":core:data")
-include(":core:designsystem")
+
+// Core
+include(":core:common")
 include(":core:model")
 include(":core:camera")
+include(":core:blurring")
 include(":core:ml")
 include(":core:tracking")
-include(":core:blurring")
+include(":core:recognition")
+include(":core:domain")
+include(":core:data")
+include(":core:designsystem")
+
+// Features
 include(":feature:camera")
+include(":feature:gallery")
 include(":feature:settings")
+
+// Benchmarks
+include(":benchmark")

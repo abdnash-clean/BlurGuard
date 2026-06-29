@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nash.core.ml"
+    namespace = "com.nash.core.domain"
     compileSdk = 37
 
     defaultConfig {
@@ -18,13 +18,14 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:camera"))
+    implementation(project(":core:blurring"))
+    implementation(project(":core:ml"))
+    implementation(project(":core:tracking"))
+    implementation(project(":core:recognition"))
+    implementation(project(":core:data"))
     implementation(project(":core:model"))
     implementation(project(":core:common"))
-
-    implementation(libs.androidx.appcompat)
+    
     implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
 }

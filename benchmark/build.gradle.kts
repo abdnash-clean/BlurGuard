@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nash.core.ml"
+    namespace = "com.nash.benchmark"
     compileSdk = 37
 
     defaultConfig {
@@ -18,13 +18,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:model"))
-    implementation(project(":core:common"))
-
-    implementation(libs.androidx.appcompat)
+    // Macrobenchmarks will depend on the app and core modules
     implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
 }
